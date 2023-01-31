@@ -1,0 +1,62 @@
+!Part 2: Mplus code used for the final five-trajectory growth mixture model.
+
+TITLE: Final five-trajectory growth mixture model
+
+DATA:  
+    FILE IS [filename].dat; 
+
+VARIABLE: 
+    NAMES ARE 
+        id
+        ks1 ks2 ks4; 
+  
+    USEVARIABLES  ARE
+        ks1 ks2 ks4; 
+
+    MISSING ARE ALL (-9999);    
+    IDVARIABLE IS id;
+    CLASSES = c(5);
+    
+ANALYSIS: 
+    ESTIMATOR = MLR; 
+    PROCESSORS = 4; 
+    TYPE = MIXTURE;
+
+MODEL: 
+%OVERALL%
+    i s | ks1@0 ks2@4 ks4@9;
+    i WITH s;
+
+%c#1%
+    [i];
+    [s];
+    
+%c#2%
+    [i];
+    [s];
+
+%c#3%
+    [i];
+    [s]; !(A);
+
+%c#4%
+    [i];
+    [s]; !(B);
+
+%c#5%
+    [i];
+    [s];
+
+!MODEL TEST: !Used to conduct Wald test between two declining trajectories
+!A=B;
+
+PLOT:
+    TYPE = PLOT3; 
+    SERIES = ks1(0) ks2(4) ks4(9);
+    
+OUTPUT:
+    STDYX; 
+
+SAVEDATA:
+    SAVE=CPROB;
+    FILE IS cprob_5.txt;
