@@ -1,0 +1,310 @@
+*Part 3: Stata code used after growth mixture modelling to further clean NPD data and CRIS data, and to conduct multinomial logistic regression analyses.
+
+*********************************
+*Exposure and covariate cleaning*
+*********************************
+*Gender
+gen gender=.
+replace gender=0 if ks1_gender=="F" & gender==.
+replace gender=1 if ks1_gender=="M" & gender==.
+replace gender=0 if ks2_gender=="F" & gender==.
+replace gender=1 if ks2_gender=="M" & gender==.
+replace gender=0 if ks4_gender=="F" & gender==.
+replace gender=1 if ks4_gender=="M" & gender==.
+replace gender=0 if gender_ab06=="F" & gender==.
+replace gender=1 if gender_ab06=="M" & gender==.
+replace gender=0 if gender_ab07=="F" & gender==.
+replace gender=1 if gender_ab07=="M" & gender==.
+replace gender=0 if gender_ab08=="F" & gender==.
+replace gender=1 if gender_ab08=="M" & gender==.
+replace gender=0 if gender_ab09=="F" & gender==.
+replace gender=1 if gender_ab09=="M" & gender==.
+replace gender=0 if gender_ab10=="F" & gender==.
+replace gender=1 if gender_ab10=="M" & gender==.
+replace gender=0 if gender_ab11=="F" & gender==.
+replace gender=1 if gender_ab11=="M" & gender==.
+replace gender=0 if gender_ab12=="F" & gender==.
+replace gender=1 if gender_ab12=="M" & gender==.
+replace gender=0 if gender_ab13=="F" & gender==.
+replace gender=1 if gender_ab13=="M" & gender==.
+replace gender=0 if gender_ab14=="F" & gender==.
+replace gender=1 if gender_ab14=="M" & gender==.
+replace gender=0 if Gender_ID=="Female" & gender==.
+replace gender=1 if Gender_ID=="Male" & gender==.
+lab def gender 0 "Female" 1 "Male" , modify
+lab val gender gender
+
+*FSM eligibility
+gen fsm=.
+replace fsm=0 if census_fsmeligible==0 | ///
+				census_everfsm_6==0 | /// 
+				fsmeligible_ab==0 | /// 
+				fsmeligible_ab06==0 | /// 
+				fsmeligible_ab07==0 | /// 
+				fsmeligible_ab08==0 | /// 
+				fsmeligible_ab09==0 | /// 
+				fsmeligible_ab10==0 | /// 
+				fsmeligible_ab11==0 | /// 
+				fsmeligible_ab12==0 | /// 
+				fsmeligible_ab13==0 | /// 
+				fsmeligible_ab14==0 
+
+replace fsm=1 if census_fsmeligible==1 | ///
+				census_everfsm_6==1 | /// 
+				fsmeligible_ab==1 | /// 
+				fsmeligible_ab06==1 | /// 
+				fsmeligible_ab07==1 | /// 
+				fsmeligible_ab08==1 | /// 
+				fsmeligible_ab09==1 | /// 
+				fsmeligible_ab10==1 | /// 
+				fsmeligible_ab11==1 | /// 
+				fsmeligible_ab12==1 | /// 
+				fsmeligible_ab13==1 | /// 
+				fsmeligible_ab14==1 
+
+lab define fsm 0 "Ineligible" 1 "Eligible" 
+lab val fsm fsm
+lab var fsm "Ever FSM eligible?"
+
+*Ethnicity
+gen ethnicity=.
+replace ethnicity=0 if ethnic_group==1
+replace ethnicity=1 if ethnic_group==2
+replace ethnicity=2 if ethnic_group==3
+replace ethnicity=3 if ethnic_group==4
+replace ethnicity=4 if ethnic_group==5 | ethnic_group==6
+
+lab define ethnicity ///
+	0 "White" ///
+	1 "Black" ///
+	2 "Asian" ///
+	3 "Mixed" ///
+	4 "Other"
+lab val ethnicity ethnicity
+lab var ethnicity "Ethnicity"
+
+gen ethnicity_cris=.
+replace ethnicity_cris=0 if ethnicitycleaned=="British (A)" 
+replace ethnicity_cris=0 if ethnicitycleaned=="Irish (B)" 
+replace ethnicity_cris=0 if ethnicitycleaned=="Any other white background (C)" 
+replace ethnicity_cris=1 if ethnicitycleaned=="Caribbean (M)" 
+replace ethnicity_cris=1 if ethnicitycleaned=="African (N)" 
+replace ethnicity_cris=1 if ethnicitycleaned=="Any other black background (P)"
+replace ethnicity_cris=2 if ethnicitycleaned=="Indian (H)" 
+replace ethnicity_cris=2 if ethnicitycleaned=="Pakistani (J)" 
+replace ethnicity_cris=2 if ethnicitycleaned=="Bangladeshi (K)"
+replace ethnicity_cris=2 if ethnicitycleaned=="Any other Asian background (L)"
+replace ethnicity_cris=3 if ethnicitycleaned=="Any other mixed background (G)" 
+replace ethnicity_cris=3 if ethnicitycleaned=="White and Asian (F)" 
+replace ethnicity_cris=3 if ethnicitycleaned=="White and Black African (E)" 
+replace ethnicity_cris=3 if ethnicitycleaned=="White and black Caribbean (D)" 
+replace ethnicity_cris=4 if ethnicitycleaned=="Chinese (R)"
+replace ethnicity_cris=4 if ethnicitycleaned=="Any other ethnic group (S)" 
+lab def ethnicity_cris 0 "White" 1 "Black" 2 "Asian" 3 "Mixed" 4 "Other" , modify
+lab val ethnicity_cris ethnicity_cris
+
+replace ethnicity=ethnicity_cris if ethnicity==.
+
+*Birth year
+gen birth_year_der=year(censusderiveddob)
+gen birth_year_cris=year(cleaneddateofbirth)
+
+gen birth_year_ks1=ks1_acadyr_num - ks1_age_start 
+replace birth_year_ks1=birth_year_ks1 - 1 if ks1_monthofbirth>=9 & ks1_monthofbirth!=.
+
+replace ks2_age_start=. if ks2_age_start==0 | ks2_age_start==39 | ks2_age_start==100 //Implausible values
+gen birth_year_ks2=ks2_acadyr_num - ks2_age_start 
+replace birth_year_ks2=birth_year_ks2 - 1 if ks2_monthofbirth>=9 & ks2_monthofbirth!=.
+
+gen birth_year_ks4=ks4_acadyr_num - ks4_age_start 
+replace birth_year_ks4=birth_year_ks4 - 1 if ks4_monthofbirth>=9 & ks4_monthofbirth!=.
+
+egen birth_year_mean=rowmean(birth_year_der birth_year_cris birth_year_ks1 birth_year_ks2 birth_year_ks4)
+gen birth_year=round(birth_year_mean, 1.0)
+
+*Relative age in school year
+gen birth_month=.
+lab def birth_month ///
+	1 "Jan" ///
+	2 "Feb" ///
+	3 "Mar" ///
+	4 "Apr" ///
+	5 "May" ///
+	6 "Jun" ///
+	7 "Jul" ///
+	8 "Aug" ///
+	9 "Sep" ///
+	10 "Oct" ///
+	11 "Nov" ///
+	12 "Dec" , modify
+lab val birth_month birth_month
+
+replace birth_month=census_monthofbirth
+replace birth_month=ks1_monthofbirth if birth_month==.
+replace birth_month=ks2_monthofbirth if birth_month==.
+replace birth_month=ks4_monthofbirth if birth_month==.
+replace birth_month=monthofbirth_ab if birth_month==.
+replace birth_month=monthofbirth_ab06 if birth_month==.
+replace birth_month=monthofbirth_ab07 if birth_month==.
+replace birth_month=monthofbirth_ab08 if birth_month==.
+replace birth_month=monthofbirth_ab09 if birth_month==.
+replace birth_month=monthofbirth_ab10 if birth_month==.
+replace birth_month=monthofbirth_ab11 if birth_month==.
+replace birth_month=monthofbirth_ab12 if birth_month==.
+replace birth_month=monthofbirth_ab13 if birth_month==.
+replace birth_month=monthofbirth_ab14 if birth_month==.
+
+gen cris_monthofbirth=month(cleaneddateofbirth)
+replace birth_month=cris_monthofbirth if birth_month==.
+
+gen relative_age=.
+lab def relative_age 0 "Autumn" 1 "Spring" 2 "Summer" , modify
+lab val relative_age relative_age
+replace relative_age=0 if inlist(birth_month, 9, 10, 11, 12)
+replace relative_age=1 if inlist(birth_month, 1, 2, 3, 4)
+replace relative_age=2 if inlist(birth_month, 5, 6, 7, 8)
+
+*Depression
+gen birth_day=1
+gen birthday_derived=mdy(birth_month, birth_day, birth_year)
+format birthday_derived %td
+
+gen f32_diagnosis_date_formatted=date(f32_diagnosis_date, "MDY")
+format f32_diagnosis_date_formatted %td
+gen f33_diagnosis_date_formatted=date(f33_diagnosis_date, "MDY")
+format f33_diagnosis_date_formatted %td
+
+personage birthday_derived f32_diagnosis_date_formatted , gen(f32_age)
+personage birthday_derived f33_diagnosis_date_formatted , gen(f33_age)
+
+gen f32=0
+replace f32=1 if f32_diagnosis==1 & f32_age<18
+
+gen f33=0
+replace f33=1 if f33_diagnosis==1 & f33_age<18
+
+gen dep=0
+replace dep=1 if f32==1 | f33==1
+lab def dep 0 "No" 1 "Yes"
+lab val dep dep
+
+*Age at first depression diagnosis
+gen dep_age=.
+replace dep_age=f32_age if dep==1
+replace dep_age=f33_age if dep==1 & f33_age<f32_age & f33_age!=.
+
+*Neurodevelopmental disorder
+gen neuro=0
+replace neuro=1 if id_ever==1 | pdd_ever==1 | adhd_ever==1
+lab def neuro 0 "No" 1 "Yes"
+lab val neuro neuro
+
+*Attainment thresholds
+*Year 2
+foreach var of varlist ks1_reading ks1_writing ks1_maths ks1_science {
+	gen `var'_threshold=.
+	replace `var'_threshold=0 if `var'=="W" | `var'=="w" | `var'=="D" | `var'=="A" | `var'=="1"
+	replace `var'_threshold=1 if `var'=="2" | `var'=="2C" | `var'=="2c" | `var'=="2B" | `var'=="2b" | `var'=="2A" | `var'=="2a" | `var'=="3" | `var'=="4" | `var'=="4+"
+	label define `var'_threshold 0 "Below level 2" 1 "Level 2 and above" , modify
+	label val `var'_threshold `var'_threshold
+	tab `var' `var'_threshold , miss
+	}
+	
+gen ks1_threshold_all=.
+replace ks1_threshold_all=1 if ks1_reading_threshold==1 & ks1_writing_threshold==1 & ks1_maths_threshold==1 & ks1_science_threshold==1
+replace ks1_threshold_all=0 if ks1_reading_threshold==0 | ks1_writing_threshold==0 | ks1_maths_threshold==0 | ks1_science_threshold==0
+	
+*Year 6
+foreach var of varlist ks2_englev ks2_matlev {
+	gen `var'_4=.
+	replace `var'_4=0 if `var'=="B" | `var'=="T" | `var'=="N" | `var'=="A" | `var'=="Q" | `var'=="2" | `var'=="3"
+	replace `var'_4=1 if `var'=="4" | `var'=="5" | `var'=="6"
+	label define `var'_4 0 "Less than 4" 1 "4 and above" , modify
+	label val `var'_4 `var'_4
+	tab `var' `var'_4 , miss
+	}
+
+foreach var of varlist ks2_matlev {
+	gen `var'_4_slt=.
+	replace `var'_4_slt=0 if `var'=="B" | `var'=="T" | `var'=="A" | `var'=="Q" | `var'=="2" | `var'=="3"
+	replace `var'_4_slt=1 if `var'=="4" | `var'=="5" | `var'=="6"
+	label define `var'_4_slt 0 "Less than 4" 1 "4 and above" , modify
+	label val `var'_4_slt `var'_4
+	tab `var' `var'_4_slt , miss
+	}	
+
+replace ks2_matlev_4=ks2_matlev_4_slt if ks2_slt_app==1
+
+gen ks2_threshold_all=.
+replace ks2_threshold_all=1 if ks2_englev_4==1 & ks2_matlev_4==1 
+replace ks2_threshold_all=0 if ks2_englev_4==0 | ks2_matlev_4==0 
+lab define ks2_threshold_all 0 "No" 1 "Yes" , modify
+lab val ks2_threshold_all ks2_threshold_all
+
+*Year 11
+tab ks4_level2_em , m
+
+***********************************
+***Inverse probability weighting***
+***********************************
+*1. Summarising missing data
+misstable summarize trajectory dep gender ethnicity fsm neuro relative_age
+misstable patterns trajectory dep gender ethnicity fsm neuro relative_age, freq
+
+*2. Investigating how the other variables and birth year predict missingness in fsm and ethnicity
+gen fsm_missing=(fsm!=.)
+logistic fsm_missing i.trajectory i.dep i.gender i.neuro i.relative_age birth_year
+
+gen ethnicity_missing=(ethnicity!=.)
+logistic ethnicity_missing i.trajectory i.dep i.gender i.neuro i.relative_age birth_year
+
+*3. Generating a binary variable indicating whether or not a complete case
+gen complete_case=(trajectory!=. & dep!=. & gender!=. & ethnicity!=. & fsm!=. & neuro!=. & relative_age!=.)
+
+*4. Model probability of being a complete case as a function of fully observed variables and birth year
+logistic complete_case i.trajectory i.dep i.gender i.neuro i.relative_age birth_year 
+
+*5. Create weight variable
+predict pr, pr
+gen wt=1/pr
+
+*6. Plot weights
+hist wt if complete_case==1
+tabstat wt if complete_case==1 , s(min max)
+
+*********************************
+*Multinomial logistic regression*
+*********************************
+drop if complete_case==0
+
+*Univariable
+mlogit trajectory i.dep [pweight=wt] , base(1) rrr
+mlogit trajectory i.gender [pweight=wt] , base(1) rrr
+mlogit trajectory i.ethnicity [pweight=wt] , base(1) rrr
+mlogit trajectory i.fsm [pweight=wt] , base(1) rrr
+mlogit trajectory i.neuro [pweight=wt] , base(1) rrr
+mlogit trajectory i.relative_age [pweight=wt] , base(1) rrr
+
+*Multivariable
+mlogit trajectory i.dep i.gender i.ethnicity i.fsm i.neuro i.relative_age [pweight=wt] , base(1) rrr
+
+*Post-estimation command
+test [3]1.dep = [4]1.dep
+
+*******************************
+*Sensitivity linear regression*
+*******************************
+replace high_prob=high_prob*100
+regress high_prob i.dep i.gender i.ethnicity i.fsm i.neuro i.relative_age [pweight=wt] 
+
+replace slightdecline_prob=slightdecline_prob*100
+regress slightdecline_prob i.dep i.gender i.ethnicity i.fsm i.neuro i.relative_age [pweight=wt] 
+
+replace strongdecline_prob=strongdecline_prob*100
+regress strongdecline_prob i.dep i.gender i.ethnicity i.fsm i.neuro i.relative_age [pweight=wt] 
+
+replace improving_prob=improving_prob*100
+regress improving_prob i.dep i.gender i.ethnicity i.fsm i.neuro i.relative_age [pweight=wt] 
+
+replace low_prob=low_prob*100
+regress low_prob i.dep i.gender i.ethnicity i.fsm i.neuro i.relative_age [pweight=wt]
