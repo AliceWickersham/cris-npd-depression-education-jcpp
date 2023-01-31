@@ -1,0 +1,132 @@
+*Part 1: Stata code used prior to growth mixture modelling to clean NPD data, and to define the study sample.
+
+**************************
+*Cleaning attainment data*
+**************************
+
+foreach var of varlist ks1_reading ks1_writing ks1_maths ks1_science {
+	gen `var'_pse=.
+	replace `var'_pse=3 if `var'=="W" | `var'=="w"
+	replace `var'_pse=9 if `var'=="1"
+	replace `var'_pse=13 if `var'=="2C" | `var'=="2c"
+	replace `var'_pse=15 if `var'=="2" | `var'=="2B" | `var'=="2b"
+	replace `var'_pse=17 if `var'=="2A" | `var'=="2a"
+	replace `var'_pse=21 if `var'=="3"
+	replace `var'_pse=27 if `var'=="4" 
+	tab `var'_pse `var'
+	}
+	
+foreach var of varlist ks2_matlev {
+	gen `var'_pse=.
+	replace `var'_pse=15 if `var'=="B" | `var'=="2"
+	replace `var'_pse=15 if `var'=="N" & ks2_sltpilot==.
+	replace `var'_pse=15 if `var'=="N" & ks2_sltpilot==0
+	replace `var'_pse=21 if `var'=="3"
+	replace `var'_pse=27 if `var'=="4" 
+	replace `var'_pse=33 if `var'=="5"
+	replace `var'_pse=39 if `var'=="6"
+	tab `var' `var'_pse 
+	}
+
+foreach var of varlist ks2_englev {
+	gen `var'_pse=.
+	replace `var'_pse=15 if `var'=="B" | `var'=="2"
+	replace `var'_pse=15 if `var'=="N" 
+	replace `var'_pse=21 if `var'=="3"
+	replace `var'_pse=27 if `var'=="4" 
+	replace `var'_pse=33 if `var'=="5"
+	replace `var'_pse=39 if `var'=="6"
+	tab `var' `var'_pse 
+	}
+
+*Supplementing ks2_matpoints if available while ks2_matlev_pse is missing:
+
+replace ks2_matlev_pse=ks2_matpoints if ks2_matlev_pse==. & ks2_matpoints!=0
+
+
+*********************************************
+*Creating an indicator of assessment spacing*
+*********************************************
+foreach var of varlist ks1_acadyr ks2_acadyr ks4_acadyr {
+	gen `var'_num=.
+	replace `var'_num=1997 if `var'=="1997/1998"
+	replace `var'_num=1998 if `var'=="1998/1999"
+	replace `var'_num=1999 if `var'=="1999/2000"	
+	replace `var'_num=2000 if `var'=="2000/2001"
+	replace `var'_num=2001 if `var'=="2001/2002"
+	replace `var'_num=2002 if `var'=="2002/2003"
+	replace `var'_num=2003 if `var'=="2003/2004"
+	replace `var'_num=2004 if `var'=="2004/2005"
+	replace `var'_num=2005 if `var'=="2005/2006"
+	replace `var'_num=2006 if `var'=="2006/2007"
+	replace `var'_num=2007 if `var'=="2007/2008"
+	replace `var'_num=2008 if `var'=="2008/2009"
+	replace `var'_num=2009 if `var'=="2009/2010"
+	replace `var'_num=2010 if `var'=="2010/2011"
+	replace `var'_num=2011 if `var'=="2011/2012"
+	replace `var'_num=2012 if `var'=="2012/2013"
+	replace `var'_num=2013 if `var'=="2013/2014"
+	tab `var'_num `var' , m
+	}
+
+	
+gen ks1_to_ks2=ks2_acadyr_num - ks1_acadyr_num
+lab var ks1_to_ks2 "Number of years between KS1 and KS2"
+gen ks2_to_ks4=ks4_acadyr_num - ks2_acadyr_num
+lab var ks2_to_ks4 "Number of years between KS2 and KS4"
+gen ks1_to_ks4=ks4_acadyr_num - ks1_acadyr_num
+lab var ks1_to_ks4 "Number of years between KS1 and KS4"
+
+**************************************
+*Applying first eligibility criterion*
+**************************************
+*Took assessments in a different temporal order:
+drop if ks1_to_ks2<1
+drop if ks1_to_ks4<1
+drop if ks2_to_ks4<1
+
+*Disapplied, absence, ineligible for tests, or unable to access all assessments in Years 2 or 6
+foreach var of varlist ks1_reading ks1_writing ks1_maths ks1_science {
+	gen `var'_abdis=1 if `var'=="D" | `var'=="A" | `var'=="U" 
+	tab `var' `var'_abdis , m
+}
+
+foreach var of varlist ks2_englev ks2_matlev {
+	gen `var'_abdis=1 if `var'=="D" | `var'=="A" | `var'=="T" | `var'=="Y" | `var'=="Z" 
+	tab `var' `var'_abdis , m
+}
+
+drop if ks1_reading_abdis==1 & ks1_writing_abdis==1 & ks1_maths_abdis==1 & ks1_science_abdis==1
+drop if ks2_englev_abdis==1 & ks2_matlev_abdis==1
+
+***************************************************
+*Generating mean average point scores and z-scores*
+***************************************************
+*Year 2
+egen ks1_pse_total=rowmean(ks1_reading_pse ks1_writing_pse ks1_maths_pse ks1_science_pse)
+replace ks1_pse_total=round(ks1_pse_total , 0.1)
+
+tab ks1_acadyr , summ(ks1_pse_total) //No years where n=1
+egen mean_ks1=mean(ks1_pse_total), by(ks1_acadyr)
+egen sd_ks1=sd(ks1_pse_total), by(ks1_acadyr)
+gen ks1_standardz=(ks1_pse_total-mean_ks1)/sd_ks1
+
+*Year 6
+egen ks2_pse_total=rowmean(ks2_englev_pse ks2_matlev_pse)
+
+tab ks2_acadyr , summ(ks2_pse_total) //No years where n=1
+egen mean_ks2=mean(ks2_pse_total), by(ks2_acadyr)
+egen sd_ks2=sd(ks2_pse_total), by(ks2_acadyr)
+gen ks2_standardz=(ks2_pse_total-mean_ks2)/sd_ks2
+
+*Year 11
+tab ks4_acadyr , summ(ks4_ptscnewe) //No years where n=1
+egen mean_ks4=mean(ks4_ptscnewe), by(ks4_acadyr)
+egen sd_ks4=sd(ks4_ptscnewe), by(ks4_acadyr)
+gen ks4_standardz=(ks4_ptscnewe-mean_ks4)/sd_ks4
+
+
+***************************************
+*Applying second eligibility criterion*
+***************************************
+drop if ks1_standardz==. & ks2_standardz==. & ks4_standardz==.
